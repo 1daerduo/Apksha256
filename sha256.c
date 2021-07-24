@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "openssl/sha.h"
 #include "sha256.h"
 
@@ -52,6 +53,35 @@ int sha256encrypt(const char *filepath, unsigned char *md)
 	fclose(fp);
 	return 0;
 }
+int sha256encryptbig(const char *filepath, unsigned char *md, unsigned int readlen)
+{
+	FILE* fp;
+	SHA256_CTX ctx;
+	size_t len = 0;
+	char *buf;
+	buf = (char *)malloc(readlen);
+	if (buf == NULL) {
+		printf("%s %d \n", __FUNCTION__, __LINE__);
+		return 0;
+	}
+	memset(buf, 0, (unsigned long)readlen);
+	
+	fp = fopen(filepath, "rb");
+	if (fp == NULL) {
+		printf("Can't open \"%s\"", filepath);
+		return -1;
+	}
+	
+	SHA256_Init(&ctx);
+	len = fread(buf,1,(size_t)readlen, fp);
+	buf[(int)len] = '\0';
+	SHA256_Update(&ctx, buf, (unsigned long)len);//加入新的文件快
+	SHA256_Final(md, &ctx);
+	
+	fclose(fp);
+	free(buf);
+	return 0;
+}
 int sha256Bigfile(const char *filepath, unsigned char *md)
 {
 	FILE* fp = NULL;
@@ -67,6 +97,8 @@ int sha256Bigfile(const char *filepath, unsigned char *md)
 	}
 
 	SHA256_Init(&ctx);
+	//while(!feof(fp)) 不能用这样的检测方法去检测是否到达末尾，测试发现最终更新的sha256摘要与
+	//用命令行处理出来的摘要不一样
 	for (;;) {
 		memset(buf, 0, len+1);
 		gl = fread(buf, 1, 1024,fp);
@@ -83,13 +115,22 @@ int sha256Bigfile(const char *filepath, unsigned char *md)
 
 int main(int argc, char **argv)
 {
+	clock_t start, end;
 	char hash[65] = {0};
 	if (argc == 1) {
 		printf("please input file name!\n");
 		return 0;
 	}
+	start = clock();
 	sha256Bigfile(*(argv+1), hash);
+	end = clock();
+	printf("t:%f\n",((double)(end - start)) / CLOCKS_PER_SEC);
+	
 	memset(hash, 0, 65);
-
+	start = clock();
+	sha256encryptbig(*(argv+1), hash, 60*1024*1024);
+	end = clock();
+	printf("t:%f\n",((double)(end - start)) / CLOCKS_PER_SEC);
+	printf256(hash);
 	return 0;
 }

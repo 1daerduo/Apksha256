@@ -1,0 +1,6 @@
+a.out
+test.*
+*.bin
+hash256
+*.sign
+*.dgst
